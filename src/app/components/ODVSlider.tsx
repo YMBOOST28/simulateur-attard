@@ -15,30 +15,22 @@ interface ODVSliderProps {
 }
 
 export default function ODVSlider({ value, onChange, minODV, maxODV }: ODVSliderProps) {
-  const getODVLabel = (odv: number) => {
-    const pct = (odv - minODV) / (maxODV - minODV);
-    if (pct < 0.2) return "Engagement léger";
-    if (pct < 0.4) return "Visibilité standard";
-    if (pct < 0.65) return "Impact fort";
-    if (pct < 0.85) return "Domination locale";
-    return "Saturation maximale";
+  const safeMin = Math.max(0, minODV);
+  const safeMax = Math.max(safeMin + 1000, maxODV);
+  const safeValue = Math.max(safeMin, Math.min(safeMax, value));
+
+  const step = Math.max(1000, Math.round((safeMax - safeMin) / 50 / 1000) * 1000);
+  const pct = ((safeValue - safeMin) / (safeMax - safeMin)) * 100;
+
+  const getODVLabel = () => {
+    if (pct < 20) return { label: "Engagement léger", color: "#6B7280" };
+    if (pct < 40) return { label: "Visibilité standard", color: "#1E6FFF" };
+    if (pct < 65) return { label: "Impact fort", color: "#1DBF73" };
+    if (pct < 85) return { label: "Domination locale", color: "#F59E0B" };
+    return { label: "Saturation maximale", color: "#EF4444" };
   };
 
-  const getLabelColor = (odv: number) => {
-    const pct = (odv - minODV) / (maxODV - minODV);
-    if (pct < 0.2) return "#6B7280";
-    if (pct < 0.4) return "#1E6FFF";
-    if (pct < 0.65) return "#1DBF73";
-    if (pct < 0.85) return "#F59E0B";
-    return "#EF4444";
-  };
-
-  const step = Math.max(1000, Math.floor((maxODV - minODV) / 100) * 1000);
-  const pct = maxODV > minODV ? Math.max(0, Math.min(100, ((value - minODV) / (maxODV - minODV)) * 100)) : 0;
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(Number(e.target.value));
-  };
+  const { label, color } = getODVLabel();
 
   return (
     <div className="space-y-4">
@@ -53,74 +45,97 @@ export default function ODVSlider({ value, onChange, minODV, maxODV }: ODVSlider
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               <p className="text-sm">
-                L'ODV est calculé selon la fréquentation de l'hôpital, le nombre d'écrans, les passages du spot et sa durée. Min = 1 écran, Max = capacité totale de l'établissement.
+                L'ODV représente le nombre annuel d'opportunités pour un patient de voir votre spot. Il varie selon la fréquentation de l'hôpital et le nombre d'écrans loués (1 à 4).
               </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
 
-      <div className="space-y-3">
-        <div className="relative h-5 flex items-center">
-          <div className="absolute w-full h-3 rounded-full bg-gray-200 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-150"
-              style={{
-                width: `${pct}%`,
-                background: "linear-gradient(to right, #1E6FFF, #1DBF73)",
-              }}
-            />
-          </div>
+      {/* Valeur centrale */}
+      <div className="text-center py-2">
+        <p className="text-3xl font-bold text-[#0B1220]">{formatNumber(safeValue)}</p>
+        <p className="text-sm font-medium mt-1" style={{ color }}>{label}</p>
+      </div>
 
-          <input
-            type="range"
-            min={minODV}
-            max={maxODV}
-            step={step}
-            value={value}
-            onChange={handleChange}
-            className="absolute w-full h-5 opacity-0 cursor-pointer z-10"
-            style={{ margin: 0 }}
-          />
+      {/* Slider natif avec styles inline pour garantir le rendu */}
+      <div className="px-1">
+        <style>{`
+          .odv-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            outline: none;
+            cursor: pointer;
+            background: linear-gradient(
+              to right,
+              #1E6FFF 0%,
+              #1DBF73 ${pct}%,
+              #E5E7EB ${pct}%,
+              #E5E7EB 100%
+            );
+          }
+          .odv-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #1E6FFF;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            cursor: pointer;
+          }
+          .odv-slider::-moz-range-thumb {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #1E6FFF;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+            cursor: pointer;
+          }
+        `}</style>
+        <input
+          type="range"
+          className="odv-slider"
+          min={safeMin}
+          max={safeMax}
+          step={step}
+          value={safeValue}
+          onChange={(e) => onChange(Number(e.target.value))}
+        />
+      </div>
 
-          <div
-            className="absolute w-5 h-5 rounded-full bg-white border-2 border-[#1E6FFF] shadow-md transition-all duration-150 pointer-events-none z-20"
-            style={{ left: `calc(${pct}% - 10px)` }}
-          />
-        </div>
+      {/* Labels min/max */}
+      <div className="flex justify-between text-xs text-[#0B1F3B]/50 px-1">
+        <span>{formatNumber(safeMin)}</span>
+        <span>{formatNumber(safeMax)}</span>
+      </div>
 
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-[#0B1F3B]/50">{formatNumber(minODV)}</span>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-[#0B1220]">{formatNumber(value)}</p>
-            <p className="text-sm font-medium mt-0.5" style={{ color: getLabelColor(value) }}>
-              {getODVLabel(value)}
-            </p>
-          </div>
-          <span className="text-xs text-[#0B1F3B]/50">{formatNumber(maxODV)}</span>
-        </div>
-
-        <div className="flex gap-2 justify-center">
-          <button
-            type="button"
-            onClick={() => onChange(Math.max(minODV, value - step * 5))}
-            className="px-3 py-1 rounded-full border border-[#0B1F3B]/20 text-sm text-[#0B1F3B] hover:bg-[#0B1F3B]/5 transition-colors"
-          >
-            −
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange(Math.min(maxODV, value + step * 5))}
-            className="px-3 py-1 rounded-full border border-[#0B1F3B]/20 text-sm text-[#0B1F3B] hover:bg-[#0B1F3B]/5 transition-colors"
-          >
-            +
-          </button>
-        </div>
+      {/* Boutons +/- */}
+      <div className="flex gap-2 justify-center">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(safeMin, safeValue - step * 3))}
+          className="px-4 py-1.5 rounded-full border border-[#0B1F3B]/20 text-sm text-[#0B1F3B] hover:bg-[#0B1F3B]/5 transition-colors"
+        >
+          − Moins
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(safeMax, safeValue + step * 3))}
+          className="px-4 py-1.5 rounded-full border border-[#0B1F3B]/20 text-sm text-[#0B1F3B] hover:bg-[#0B1F3B]/5 transition-colors"
+        >
+          + Plus
+        </button>
       </div>
 
       <p className="text-xs text-[#0B1F3B]/50 flex items-start gap-1">
         <span>*</span>
-        <span>ODV = fréquentation hôpital × écrans × spots vus × 365 jours. Taux de conversion basé sur les études Publicis / Broadsign DOOH Santé (× 0.8 × 0.3 × 0.002)</span>
+        <span>ODV = fréquentation hôpital × nombre d'écrans × 365 jours. Taux de conversion basé sur les études Publicis / Broadsign DOOH Santé.</span>
       </p>
     </div>
   );
