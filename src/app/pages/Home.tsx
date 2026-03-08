@@ -93,7 +93,7 @@ export default function Home() {
                 <ArrowDown className="ml-2 w-5 h-5" />
               </Button>
               
-              <a href="https://www.attard-multimedia.com/contact" target="_blank" rel="noopener noreferrer">
+              <Link to="/rendez-vous">
                 <Button
                   size="lg"
                   variant="outline"
@@ -101,7 +101,7 @@ export default function Home() {
                 >
                   Parler à un expert
                 </Button>
-              </a>
+              </Link>
             </div>
           </motion.div>
         </div>
@@ -329,12 +329,12 @@ export default function Home() {
                 </Button>
               </Link>
 
-              <a href={`${odooBase}/contact`} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+              <Link to="/rendez-vous" onClick={handleSaveAndGo} className="w-full sm:w-auto">
                 <Button size="lg" variant="outline" className="border-[#1E6FFF] text-[#1E6FFF] hover:bg-[#1E6FFF]/10 w-full sm:w-auto">
                   <Calendar className="mr-2 w-5 h-5" />
                   Parler à un expert
                 </Button>
-              </a>
+              </Link>
 
               {selectedHospitalData && (
                 <a href={hospitalUrl} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">

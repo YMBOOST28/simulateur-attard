@@ -11,12 +11,14 @@ import { Checkbox } from "../components/ui/checkbox";
 import { Badge } from "../components/ui/badge";
 import { formatCurrency, formatNumber } from "../utils/calculations";
 import { loadSimulation } from "../utils/simulationStore";
+import { sendLeadToMake } from "../utils/sendLead";
 
 export default function Order() {
   const stored = loadSimulation();
   const [paymentMode, setPaymentMode] = useState<"1x" | "3x" | "6x">("1x");
   const [wantCallback, setWantCallback] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Données réelles depuis la simulation, ou fallback
   const sim = stored ? {
@@ -46,8 +48,28 @@ export default function Order() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    const formData = new FormData(e.target as HTMLFormElement);
+    await sendLeadToMake({
+      source: wantCallback ? "rappel" : "commande",
+      firstName: formData.get("firstName") as string || "",
+      lastName: formData.get("lastName") as string || "",
+      email: formData.get("email") as string || "",
+      phone: formData.get("phone") as string || "",
+      company: formData.get("companyName") as string || "",
+      callbackTime: formData.get("callbackTime") as string || "",
+      hospitalName: stored?.hospitalName,
+      professionName: stored?.professionName,
+      odv: stored?.data.odv,
+      recommendedScreens: sim?.recommendedScreens,
+      annualBudget: sim?.annualBudget,
+      roi: sim?.roi,
+      campaignDuration: sim ? `${stored?.data.campaignDuration} mois` : undefined,
+      appointmentType: paymentMode,
+    });
+    setIsLoading(false);
     setIsSubmitted(true);
   };
 
@@ -257,8 +279,10 @@ export default function Order() {
                     </div>
                   )}
 
-                  <Button type="submit" size="lg" className={`w-full text-white ${wantCallback ? "bg-[#1E6FFF] hover:bg-[#1E6FFF]/90" : "bg-[#1DBF73] hover:bg-[#1DBF73]/90"}`}>
-                    {wantCallback ? (
+                  <Button type="submit" size="lg" className={`w-full text-white ${wantCallback ? "bg-[#1E6FFF] hover:bg-[#1E6FFF]/90" : "bg-[#1DBF73] hover:bg-[#1DBF73]/90"}`} disabled={isLoading}>
+                    {isLoading ? (
+                      <span className="flex items-center gap-2"><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Envoi...</span>
+                    ) : wantCallback ? (
                       <><Phone className="mr-2 w-5 h-5" />Demander à être rappelé</>
                     ) : (
                       <><CreditCard className="mr-2 w-5 h-5" />Valider ma commande</>

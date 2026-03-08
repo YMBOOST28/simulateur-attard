@@ -1,78 +1,118 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, CheckCircle2, Calendar as CalendarIcon, Phone, Video } from "lucide-react";
+import {
+  ArrowLeft, CheckCircle2, Calendar as CalendarIcon,
+  Phone, Video, User, Building2, Mail, MessageSquare,
+  Star, Clock, Shield, ChevronRight
+} from "lucide-react";
 import Header from "../components/Header";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Checkbox } from "../components/ui/checkbox";
-import { Calendar } from "../components/ui/calendar";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { Badge } from "../components/ui/badge";
+import { formatCurrency, formatNumber } from "../utils/calculations";
+import { loadSimulation } from "../utils/simulationStore";
+import { sendLeadToMake } from "../utils/sendLead";
+
+// ─── À remplacer par votre vrai lien Calendly ───────────────────────────────
+// Exemple : https://calendly.com/attard-multimedia/consultation-dooh
+const CALENDLY_URL = "https://calendly.com/VOTRE_LIEN_CALENDLY";
+// ────────────────────────────────────────────────────────────────────────────
+
+type Step = "info" | "calendly" | "confirmed";
+type MeetingType = "visio" | "phone";
 
 export default function Appointment() {
-  const [date, setDate] = useState<Date | undefined>(new Date());
-  const [selectedTime, setSelectedTime] = useState<string>("");
-  const [contactMode, setContactMode] = useState<"visio" | "phone">("visio");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const stored = loadSimulation();
+  const sim = stored?.results;
+  const data = stored?.data;
 
-  const timeSlots = [
-    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-    "14:00", "14:30", "15:00", "15:30", "16:00", "16:30", "17:00"
-  ];
+  const durationLabel = data
+    ? ({ 6: "6 mois", 12: "1 an", 24: "2 ans", 36: "3 ans" } as Record<number, string>)[data.campaignDuration]
+    : "1 an";
+  const totalBudget = sim && data ? sim.annualBudget * (data.campaignDuration / 12) : 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [step, setStep] = useState<Step>("info");
+  const [meetingType, setMeetingType] = useState<MeetingType>("visio");
+  const [isLoading, setIsLoading] = useState(false);
+  const [form, setForm] = useState({
+    firstName: "", lastName: "", email: "", phone: "",
+    company: "", message: "", consent: false,
+  });
+
+  const calendlyWithParams = stored
+    ? `${CALENDLY_URL}?name=${encodeURIComponent(form.firstName + " " + form.lastName)}&email=${encodeURIComponent(form.email)}&a1=${encodeURIComponent(stored.hospitalName)}&a2=${encodeURIComponent(meetingType === "visio" ? "Visio" : "Téléphone")}`
+    : CALENDLY_URL;
+
+  const handleSubmitInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitted(true);
+    setIsLoading(true);
+    await sendLeadToMake({
+      source: "rendez-vous",
+      firstName: form.firstName,
+      lastName: form.lastName,
+      email: form.email,
+      phone: form.phone,
+      company: form.company,
+      message: form.message,
+      appointmentType: meetingType,
+      hospitalName: stored?.hospitalName,
+      professionName: stored?.professionName,
+      odv: stored?.data.odv,
+      recommendedScreens: sim?.recommendedScreens,
+      annualBudget: sim?.annualBudget,
+      roi: sim?.roi,
+      campaignDuration: durationLabel,
+    });
+    setIsLoading(false);
+    setStep("calendly");
   };
 
-  if (isSubmitted) {
+  // ── Étape 3 : Confirmé ──────────────────────────────────────────────────
+  if (step === "confirmed") {
     return (
       <div className="min-h-screen bg-[#F5F7FA]">
         <Header />
         <div className="container mx-auto px-4 py-16">
           <div className="max-w-2xl mx-auto text-center">
-            <div className="p-4 rounded-full bg-[#1DBF73]/10 w-20 h-20 flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 className="w-12 h-12 text-[#1DBF73]" />
+            <div className="relative w-24 h-24 mx-auto mb-6">
+              <div className="absolute inset-0 rounded-full bg-[#1DBF73]/20 animate-ping" />
+              <div className="relative p-5 rounded-full bg-[#1DBF73]/10 w-24 h-24 flex items-center justify-center">
+                <CheckCircle2 className="w-12 h-12 text-[#1DBF73]" />
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-[#0B1220] mb-4">
-              Votre rendez-vous est confirmé !
-            </h1>
-            <p className="text-lg text-[#0B1F3B]/60 mb-6">
-              Vous recevrez un email de confirmation avec le récapitulatif de votre simulation.
+            <h1 className="text-3xl font-bold text-[#0B1220] mb-3">Rendez-vous confirmé !</h1>
+            <p className="text-[#0B1F3B]/60 mb-8">
+              Vous recevrez une invitation par email avec le lien {meetingType === "visio" ? "visioconférence" : "de rappel"}.
+              Notre expert préparera votre rapport personnalisé avant l'échange.
             </p>
-            <Card className="p-6 mb-8 bg-white border-[#0B1F3B]/10">
+            <Card className="p-6 mb-8 bg-white border-[#0B1F3B]/10 text-left">
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#0B1F3B]/60">Date</span>
-                  <span className="font-semibold text-[#0B1220]">
-                    {date ? format(date, "EEEE d MMMM yyyy", { locale: fr }) : ""}
-                  </span>
+                <div className="flex items-center gap-3 pb-3 border-b border-[#0B1F3B]/8">
+                  <div className="p-2 rounded-lg bg-[#1E6FFF]/10">
+                    {meetingType === "visio" ? <Video className="w-4 h-4 text-[#1E6FFF]" /> : <Phone className="w-4 h-4 text-[#1E6FFF]" />}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#0B1220]">{meetingType === "visio" ? "Visioconférence 30 min" : "Appel téléphonique 30 min"}</p>
+                    <p className="text-xs text-[#0B1F3B]/50">Consultation gratuite avec un expert Attard Multimédia</p>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#0B1F3B]/60">Heure</span>
-                  <span className="font-semibold text-[#0B1220]">{selectedTime}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#0B1F3B]/60">Mode</span>
-                  <span className="font-semibold text-[#0B1220]">
-                    {contactMode === "visio" ? "Visioconférence" : "Téléphone"}
-                  </span>
-                </div>
+                {stored && (
+                  <>
+                    <div className="flex justify-between text-sm"><span className="text-[#0B1F3B]/60">Hôpital analysé</span><span className="font-medium">{stored.hospitalName}</span></div>
+                    <div className="flex justify-between text-sm"><span className="text-[#0B1F3B]/60">Profession</span><span className="font-medium">{stored.professionName}</span></div>
+                    {sim && <div className="flex justify-between text-sm"><span className="text-[#0B1F3B]/60">ROI estimé</span><Badge className="bg-[#1DBF73] text-white">+{sim.roi.toFixed(1)}%</Badge></div>}
+                  </>
+                )}
               </div>
             </Card>
-            <p className="text-sm text-[#0B1F3B]/60 mb-8">
-              Votre rapport PDF sera préparé pour le rendez-vous. Un expert Attard Multimédia va vous recontacter avec votre rapport PDF personnalisé.
-            </p>
-            <Link to="/">
-              <Button size="lg" className="bg-[#1E6FFF] hover:bg-[#1E6FFF]/90">
-                Retour à l'accueil
-              </Button>
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/brochure"><Button size="lg" variant="outline" className="border-[#1E6FFF] text-[#1E6FFF]">Télécharger mon rapport PDF</Button></Link>
+              <Link to="/"><Button size="lg" className="bg-[#1E6FFF] text-white">Retour à l'accueil</Button></Link>
+            </div>
           </div>
         </div>
       </div>
@@ -84,219 +124,355 @@ export default function Appointment() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
+
           {/* Breadcrumb */}
           <div className="mb-6">
             <Link to="/" className="inline-flex items-center text-sm text-[#1E6FFF] hover:underline">
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Retour au simulateur
+              <ArrowLeft className="w-4 h-4 mr-1" />Retour au simulateur
             </Link>
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold text-[#0B1220] mb-3">
-            Prendre rendez-vous avec un expert Attard Multimédia
-          </h1>
-          <p className="text-lg text-[#0B1F3B]/60 mb-8">
-            Ce rendez-vous vous permet de comprendre vos chiffres, votre ROI et d'obtenir un plan d'action personnalisé.
-          </p>
+          {/* Hero */}
+          <div className="mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-[#0B1220] mb-3">
+              Parler à un expert Attard Multimédia
+            </h1>
+            <p className="text-lg text-[#0B1F3B]/60 max-w-2xl">
+              Obtenez des recommandations sur mesure, une analyse approfondie de vos projections et un plan d'action personnalisé — gratuitement et sans engagement.
+            </p>
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Calendar Selection */}
-            <Card className="p-8 border-[#0B1F3B]/10 bg-white">
-              <h3 className="text-xl font-semibold text-[#0B1220] mb-6">
-                Choisir un créneau avec un expert
-              </h3>
-
-              <div className="grid md:grid-cols-2 gap-8">
-                <div>
-                  <Label className="mb-3 block">Sélectionnez une date</Label>
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    disabled={(date) => date < new Date() || date.getDay() === 0 || date.getDay() === 6}
-                    className="rounded-md border border-[#0B1F3B]/10"
-                    locale={fr}
-                  />
+          {/* Progress steps */}
+          <div className="flex items-center gap-3 mb-8">
+            {[
+              { id: "info", label: "Vos informations" },
+              { id: "calendly", label: "Choisir un créneau" },
+            ].map((s, i) => (
+              <div key={s.id} className="flex items-center gap-3">
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  step === s.id
+                    ? "bg-[#1E6FFF] text-white shadow-sm"
+                    : step === "confirmed" || (s.id === "info" && step === "calendly")
+                      ? "bg-[#1DBF73]/10 text-[#1DBF73]"
+                      : "bg-white text-[#0B1F3B]/40 border border-[#0B1F3B]/10"
+                }`}>
+                  <span className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                    step === s.id ? "bg-white/20" : "bg-current/10"
+                  }`}>{i + 1}</span>
+                  {s.label}
                 </div>
+                {i < 1 && <ChevronRight className="w-4 h-4 text-[#0B1F3B]/20" />}
+              </div>
+            ))}
+          </div>
 
-                <div className="space-y-6">
-                  <div>
-                    <Label className="mb-3 block">Horaire disponible</Label>
-                    <div className="grid grid-cols-3 gap-2 max-h-80 overflow-y-auto">
-                      {timeSlots.map((time) => (
+          <div className="grid lg:grid-cols-3 gap-8">
+
+            {/* ── Colonne principale ── */}
+            <div className="lg:col-span-2">
+
+              {/* ÉTAPE 1 : Infos */}
+              {step === "info" && (
+                <form onSubmit={handleSubmitInfo}>
+                  <Card className="p-8 border-[#0B1F3B]/10 bg-white mb-6">
+                    <h3 className="text-xl font-semibold text-[#0B1220] mb-6 flex items-center gap-2">
+                      <User className="w-5 h-5 text-[#1E6FFF]" />
+                      Vos coordonnées
+                    </h3>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                      <div>
+                        <Label htmlFor="firstName">Prénom *</Label>
+                        <Input id="firstName" required value={form.firstName}
+                          onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
+                          className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" />
+                      </div>
+                      <div>
+                        <Label htmlFor="lastName">Nom *</Label>
+                        <Input id="lastName" required value={form.lastName}
+                          onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
+                          className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" />
+                      </div>
+                      <div>
+                        <Label htmlFor="email">Email professionnel *</Label>
+                        <div className="relative mt-1">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#0B1F3B]/30" />
+                          <Input id="email" type="email" required value={form.email}
+                            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                            className="bg-[#F5F7FA] border-[#0B1F3B]/10 pl-9" />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="phone">Téléphone *</Label>
+                        <div className="relative mt-1">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#0B1F3B]/30" />
+                          <Input id="phone" type="tel" required value={form.phone}
+                            onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                            className="bg-[#F5F7FA] border-[#0B1F3B]/10 pl-9" />
+                        </div>
+                      </div>
+                      <div className="md:col-span-2">
+                        <Label htmlFor="company">Structure / Cabinet / Entreprise *</Label>
+                        <div className="relative mt-1">
+                          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#0B1F3B]/30" />
+                          <Input id="company" required value={form.company}
+                            onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
+                            className="bg-[#F5F7FA] border-[#0B1F3B]/10 pl-9" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Message */}
+                    <div className="mt-5">
+                      <Label htmlFor="message" className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-[#1E6FFF]" />
+                        Questions ou objectifs particuliers <span className="text-[#0B1F3B]/40 font-normal">(facultatif)</span>
+                      </Label>
+                      <Textarea id="message" rows={3}
+                        value={form.message}
+                        onChange={e => setForm(f => ({ ...f, message: e.target.value }))}
+                        placeholder="Ex : Je veux comprendre comment optimiser mon budget, j'ai une ouverture en mars..."
+                        className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" />
+                    </div>
+                  </Card>
+
+                  {/* Type de RDV */}
+                  <Card className="p-8 border-[#0B1F3B]/10 bg-white mb-6">
+                    <h3 className="text-xl font-semibold text-[#0B1220] mb-5 flex items-center gap-2">
+                      <CalendarIcon className="w-5 h-5 text-[#1E6FFF]" />
+                      Format du rendez-vous
+                    </h3>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {([
+                        {
+                          id: "visio" as MeetingType,
+                          icon: Video,
+                          title: "Visioconférence",
+                          desc: "Face à face en vidéo, partage d'écran possible. Idéal pour un accompagnement complet.",
+                          badge: "Recommandé",
+                        },
+                        {
+                          id: "phone" as MeetingType,
+                          icon: Phone,
+                          title: "Téléphone",
+                          desc: "Simple et rapide. Parfait si vous êtes souvent en déplacement.",
+                          badge: null,
+                        },
+                      ]).map(({ id, icon: Icon, title, desc, badge }) => (
                         <button
-                          key={time}
+                          key={id}
                           type="button"
-                          onClick={() => setSelectedTime(time)}
-                          className={`
-                            p-3 rounded-lg border-2 text-sm font-medium transition-all
-                            ${selectedTime === time
-                              ? "bg-[#1E6FFF] border-[#1E6FFF] text-white"
-                              : "bg-white border-[#0B1F3B]/10 text-[#0B1220] hover:border-[#1E6FFF]/50"
-                            }
-                          `}
+                          onClick={() => setMeetingType(id)}
+                          className={`relative text-left p-5 rounded-xl border-2 transition-all ${
+                            meetingType === id
+                              ? "border-[#1E6FFF] bg-[#1E6FFF]/5 shadow-sm"
+                              : "border-[#0B1F3B]/10 hover:border-[#1E6FFF]/40 bg-white"
+                          }`}
                         >
-                          {time}
+                          {badge && (
+                            <span className="absolute top-3 right-3 text-xs px-2 py-0.5 rounded-full bg-[#1DBF73] text-white font-medium">
+                              {badge}
+                            </span>
+                          )}
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${
+                            meetingType === id ? "bg-[#1E6FFF]/10" : "bg-[#F5F7FA]"
+                          }`}>
+                            <Icon className={`w-5 h-5 ${meetingType === id ? "text-[#1E6FFF]" : "text-[#0B1F3B]/40"}`} />
+                          </div>
+                          <p className="font-semibold text-[#0B1220] mb-1">{title}</p>
+                          <p className="text-xs text-[#0B1F3B]/55 leading-relaxed">{desc}</p>
+                          {meetingType === id && (
+                            <div className="absolute top-3 left-3 w-2.5 h-2.5 rounded-full bg-[#1E6FFF]" />
+                          )}
                         </button>
                       ))}
                     </div>
+                    <div className="mt-4 flex items-center gap-2 p-3 bg-[#1E6FFF]/5 rounded-lg border border-[#1E6FFF]/15">
+                      <Clock className="w-4 h-4 text-[#1E6FFF] flex-shrink-0" />
+                      <p className="text-xs text-[#0B1F3B]/70">
+                        Durée estimée : <strong>30 minutes</strong> — Gratuit, sans engagement, annulable à tout moment depuis Calendly.
+                      </p>
+                    </div>
+                  </Card>
+
+                  {/* Consentement + CTA */}
+                  <div className="flex items-start space-x-3 mb-6 p-4 bg-white rounded-xl border border-[#0B1F3B]/10">
+                    <Checkbox id="consent" checked={form.consent}
+                      onCheckedChange={c => setForm(f => ({ ...f, consent: !!c }))} required />
+                    <Label htmlFor="consent" className="text-sm cursor-pointer leading-relaxed text-[#0B1F3B]/60">
+                      J'accepte qu'Attard Multimédia me recontacte pour cet échange et utilise mes informations dans le cadre de cette consultation. Pas de démarchage abusif.
+                    </Label>
                   </div>
 
-                  <div>
-                    <Label className="mb-3 block">Mode d'échange</Label>
-                    <RadioGroup value={contactMode} onValueChange={(value) => setContactMode(value as "visio" | "phone")}>
-                      <div className="flex items-center space-x-2 p-3 rounded-lg border border-[#0B1F3B]/10 bg-white mb-2">
-                        <RadioGroupItem value="visio" id="visio" />
-                        <Label htmlFor="visio" className="flex-1 cursor-pointer flex items-center gap-2">
-                          <Video className="w-4 h-4 text-[#1E6FFF]" />
-                          Échange en visio
-                        </Label>
+                  <Button
+                    type="submit"
+                    size="lg"
+                    className="w-full bg-[#1E6FFF] hover:bg-[#1E6FFF]/90 text-white h-14 text-base"
+                    disabled={isLoading || !form.consent || !form.firstName || !form.email || !form.phone || !form.company}
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        Chargement...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        Continuer vers le choix du créneau
+                        <ChevronRight className="w-5 h-5" />
+                      </span>
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              {/* ÉTAPE 2 : Calendly */}
+              {step === "calendly" && (
+                <Card className="p-0 overflow-hidden border-[#0B1F3B]/10 bg-white">
+                  <div className="p-6 border-b border-[#0B1F3B]/8 bg-gradient-to-r from-[#1E6FFF]/5 to-white">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-[#1E6FFF]/10">
+                        {meetingType === "visio"
+                          ? <Video className="w-5 h-5 text-[#1E6FFF]" />
+                          : <Phone className="w-5 h-5 text-[#1E6FFF]" />}
                       </div>
-                      <div className="flex items-center space-x-2 p-3 rounded-lg border border-[#0B1F3B]/10 bg-white">
-                        <RadioGroupItem value="phone" id="phone" />
-                        <Label htmlFor="phone" className="flex-1 cursor-pointer flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-[#1E6FFF]" />
-                          Échange par téléphone
-                        </Label>
+                      <div>
+                        <h3 className="font-semibold text-[#0B1220]">
+                          Choisissez votre créneau — {meetingType === "visio" ? "Visioconférence" : "Téléphone"}
+                        </h3>
+                        <p className="text-sm text-[#0B1F3B]/50">Calendrier en temps réel connecté à l'agenda Attard Multimédia</p>
                       </div>
-                    </RadioGroup>
+                    </div>
                   </div>
-                </div>
-              </div>
-            </Card>
 
-            {/* Contact Information Form */}
-            <Card className="p-8 border-[#0B1F3B]/10 bg-white">
-              <h3 className="text-xl font-semibold text-[#0B1220] mb-6">
-                Vos informations
-              </h3>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <Label htmlFor="civility">Civilité</Label>
-                  <Select required>
-                    <SelectTrigger className="bg-[#F5F7FA] border-[#0B1F3B]/10">
-                      <SelectValue placeholder="Sélectionner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="m">M.</SelectItem>
-                      <SelectItem value="mme">Mme</SelectItem>
-                      <SelectItem value="autre">Autre</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="firstName">Prénom *</Label>
-                  <Input id="firstName" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-
-                <div>
-                  <Label htmlFor="lastName">Nom *</Label>
-                  <Input id="lastName" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-
-                <div>
-                  <Label htmlFor="company">Nom de l'entreprise / cabinet *</Label>
-                  <Input id="company" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-
-                <div>
-                  <Label htmlFor="siret">SIRET (facultatif)</Label>
-                  <Input id="siret" className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email professionnel *</Label>
-                  <Input id="email" type="email" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-
-                <div>
-                  <Label htmlFor="phone">Numéro de téléphone *</Label>
-                  <Input id="phone" type="tel" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-
-                <div>
-                  <Label htmlFor="website">Site web (facultatif)</Label>
-                  <Input id="website" type="url" className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-
-                <div>
-                  <Label htmlFor="profession">Profession *</Label>
-                  <Select required>
-                    <SelectTrigger className="bg-[#F5F7FA] border-[#0B1F3B]/10">
-                      <SelectValue placeholder="Sélectionner votre profession" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="opticien">Opticien</SelectItem>
-                      <SelectItem value="audioprothesiste">Audioprothésiste</SelectItem>
-                      <SelectItem value="kine">Kinésithérapeute / Rééducation</SelectItem>
-                      <SelectItem value="dentaire">Dentaire</SelectItem>
-                      <SelectItem value="materiel-medical">Matériel médical</SelectItem>
-                      <SelectItem value="bien-etre">Bien-être & Prévention</SelectItem>
-                      <SelectItem value="services-sante">Services santé / Mutuelles</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="city">Ville ou zone d'implantation principale *</Label>
-                  <Input id="city" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <Label htmlFor="objective">Quel est votre principal objectif avec cette campagne ?</Label>
-                <Textarea
-                  id="objective"
-                  rows={4}
-                  className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-2"
-                  placeholder="Décrivez brièvement vos objectifs..."
-                />
-              </div>
-
-              <div className="mt-6 space-y-3">
-                <div className="flex items-start space-x-2">
-                  <Checkbox id="pdf" required />
-                  <Label htmlFor="pdf" className="text-sm cursor-pointer leading-relaxed">
-                    Je souhaite recevoir mon rapport PDF personnalisé après l'échange avec l'expert.
-                  </Label>
-                </div>
-
-                <div className="flex items-start space-x-2">
-                  <Checkbox id="contact" required />
-                  <Label htmlFor="contact" className="text-sm cursor-pointer leading-relaxed">
-                    J'accepte d'être recontacté par Attard Multimédia dans le cadre de cette demande.
-                  </Label>
-                </div>
-              </div>
-            </Card>
-
-            {/* Submit Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                type="submit"
-                size="lg"
-                className="bg-[#1DBF73] hover:bg-[#1DBF73]/90 text-white"
-                disabled={!date || !selectedTime}
-              >
-                <CalendarIcon className="mr-2 w-5 h-5" />
-                Confirmer mon rendez-vous
-              </Button>
-
-              <Link to="/">
-                <Button
-                  type="button"
-                  size="lg"
-                  variant="outline"
-                  className="border-[#1E6FFF] text-[#1E6FFF] hover:bg-[#1E6FFF]/10 w-full"
-                >
-                  Revenir au simulateur
-                </Button>
-              </Link>
+                  {/* Iframe Calendly */}
+                  {CALENDLY_URL.includes("VOTRE_LIEN") ? (
+                    <div className="flex flex-col items-center justify-center py-16 px-8 bg-[#F5F7FA] text-center">
+                      <div className="w-16 h-16 rounded-2xl bg-[#1E6FFF]/10 flex items-center justify-center mb-4">
+                        <CalendarIcon className="w-8 h-8 text-[#1E6FFF]" />
+                      </div>
+                      <h4 className="text-lg font-semibold text-[#0B1220] mb-2">Calendly à connecter</h4>
+                      <p className="text-sm text-[#0B1F3B]/55 mb-4 max-w-sm">
+                        Pour activer la prise de RDV, remplacez <code className="bg-white px-1.5 py-0.5 rounded text-[#1E6FFF] font-mono text-xs">VOTRE_LIEN_CALENDLY</code> dans le fichier <code className="bg-white px-1.5 py-0.5 rounded text-[#1E6FFF] font-mono text-xs">Appointment.tsx</code> par votre URL Calendly.
+                      </p>
+                      <div className="p-4 bg-white rounded-xl border border-[#0B1F3B]/10 text-left text-sm text-[#0B1F3B]/70 mb-6 max-w-sm w-full">
+                        <p className="font-medium text-[#0B1220] mb-2">Créer votre lien Calendly :</p>
+                        <ol className="space-y-1 list-decimal list-inside text-xs">
+                          <li>Allez sur <strong>calendly.com</strong> → créer un compte</li>
+                          <li>Nouveau type d'événement → "Consultation DOOH" 30 min</li>
+                          <li>Copiez l'URL de l'événement</li>
+                          <li>Collez-la dans <code className="text-[#1E6FFF]">CALENDLY_URL</code></li>
+                        </ol>
+                      </div>
+                      <Button
+                        size="lg"
+                        className="bg-[#1DBF73] hover:bg-[#1DBF73]/90 text-white"
+                        onClick={() => setStep("confirmed")}
+                      >
+                        <CheckCircle2 className="mr-2 w-5 h-5" />
+                        Simuler la confirmation (démo)
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <iframe
+                        src={calendlyWithParams}
+                        width="100%"
+                        height="700"
+                        frameBorder="0"
+                        title="Prendre rendez-vous"
+                        onLoad={() => {
+                          // Calendly envoie un postMessage quand le RDV est confirmé
+                          window.addEventListener("message", (e) => {
+                            if (e.data.event === "calendly.event_scheduled") {
+                              setStep("confirmed");
+                            }
+                          }, { once: true });
+                        }}
+                      />
+                      <div className="p-4 border-t border-[#0B1F3B]/8 text-center">
+                        <button
+                          onClick={() => setStep("info")}
+                          className="text-sm text-[#0B1F3B]/40 hover:text-[#1E6FFF] underline"
+                        >
+                          ← Modifier mes informations
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </Card>
+              )}
             </div>
-          </form>
+
+            {/* ── Colonne droite : récap simulation + réassurance ── */}
+            <div className="space-y-6">
+
+              {/* Récap simulation */}
+              {stored && sim ? (
+                <Card className="p-5 border-[#0B1F3B]/10 bg-white sticky top-24">
+                  <h4 className="font-semibold text-[#0B1220] mb-4 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-[#1E6FFF]" />
+                    Votre simulation
+                  </h4>
+                  <div className="space-y-2.5 text-sm">
+                    {[
+                      { label: "Hôpital", value: stored.hospitalName },
+                      { label: "Profession", value: stored.professionName },
+                      { label: "Durée campagne", value: durationLabel },
+                      { label: "Écrans conseillés", value: `${sim.recommendedScreens} écran${sim.recommendedScreens > 1 ? "s" : ""}` },
+                      { label: "ODV annuel", value: formatNumber(sim.annualPassages) },
+                      { label: "Leads estimés/an", value: formatNumber(sim.estimatedLeads) },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between">
+                        <span className="text-[#0B1F3B]/50">{label}</span>
+                        <span className="font-medium text-[#0B1220] text-right max-w-[55%]">{value}</span>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-[#0B1F3B]/8 space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-[#0B1F3B]/50">Budget total</span>
+                        <span className="font-bold text-[#1E6FFF]">{formatCurrency(totalBudget)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-[#0B1F3B]/50">ROI estimé</span>
+                        <Badge className="bg-[#1DBF73] text-white">+{sim.roi.toFixed(1)}%</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-3 bg-[#1E6FFF]/5 rounded-lg">
+                    <p className="text-xs text-[#0B1F3B]/55">
+                      L'expert analysera ces données et vous proposera des optimisations personnalisées lors du rendez-vous.
+                    </p>
+                  </div>
+                </Card>
+              ) : (
+                <Card className="p-5 border-[#0B1F3B]/10 bg-white">
+                  <p className="text-sm text-[#0B1F3B]/50 text-center">
+                    Complétez d'abord une simulation pour voir votre récapitulatif ici.
+                  </p>
+                  <Link to="/"><Button size="sm" className="w-full mt-3 bg-[#1E6FFF] text-white">Faire ma simulation</Button></Link>
+                </Card>
+              )}
+
+              {/* Réassurance */}
+              <Card className="p-5 border-[#0B1F3B]/10 bg-white">
+                <h4 className="font-semibold text-[#0B1220] mb-4">Ce que vous obtiendrez</h4>
+                <div className="space-y-3">
+                  {[
+                    { icon: Star, text: "Analyse approfondie de votre simulation", color: "text-[#1E6FFF]" },
+                    { icon: Shield, text: "Recommandations personnalisées (écrans, planning, budget)", color: "text-[#1DBF73]" },
+                    { icon: CheckCircle2, text: "Rapport PDF remis après l'échange", color: "text-[#1DBF73]" },
+                    { icon: Clock, text: "30 min sans engagement, annulable à tout moment", color: "text-[#0B1F3B]/40" },
+                  ].map(({ icon: Icon, text, color }) => (
+                    <div key={text} className="flex items-start gap-2.5 text-sm text-[#0B1F3B]/65">
+                      <Icon className={`w-4 h-4 ${color} flex-shrink-0 mt-0.5`} />
+                      {text}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
     </div>
