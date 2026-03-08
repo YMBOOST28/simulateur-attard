@@ -1,36 +1,49 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, CreditCard, CheckCircle2, Shield } from "lucide-react";
+import { ArrowLeft, CreditCard, CheckCircle2, Shield, Phone } from "lucide-react";
 import Header from "../components/Header";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Checkbox } from "../components/ui/checkbox";
 import { Badge } from "../components/ui/badge";
 import { formatCurrency, formatNumber } from "../utils/calculations";
+import { loadSimulation } from "../utils/simulationStore";
 
 export default function Order() {
+  const stored = loadSimulation();
   const [paymentMode, setPaymentMode] = useState<"1x" | "3x" | "6x">("1x");
+  const [wantCallback, setWantCallback] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  // Mock data - would come from simulation context/state in real app
-  const simulationData = {
-    hospital: "CHU de Bordeaux",
-    profession: "Opticien",
-    spotDuration: "20s",
-    campaignDuration: "1 an",
-    odv: 150000,
-    recommendedScreens: 3,
-    annualPassages: 125000,
-    estimatedLeads: 300,
-    potentialRevenue: 114000,
-    roi: 220,
-    annualBudget: 10500,
-    monthlyBudget: 875,
-    costPerDay: 29,
+  // Données réelles depuis la simulation, ou fallback
+  const sim = stored ? {
+    hospital: stored.hospitalName,
+    profession: stored.professionName,
+    spotDuration: `${stored.data.spotDuration}s`,
+    campaignDuration: { 6: "6 mois", 12: "1 an", 24: "2 ans", 36: "3 ans" }[stored.data.campaignDuration] || "1 an",
+    odv: stored.data.odv,
+    recommendedScreens: stored.results.recommendedScreens,
+    annualPassages: stored.results.annualPassages,
+    estimatedLeads: stored.results.estimatedLeads,
+    potentialRevenue: stored.results.potentialRevenue1Year,
+    roi: stored.results.roi,
+    annualBudget: stored.results.annualBudget,
+    monthlyBudget: stored.results.monthlyBudget,
+    costPerDay: stored.results.costPerDay,
+    campaignDurationMonths: stored.data.campaignDuration,
+  } : null;
+
+  const totalBudget = sim ? sim.annualBudget * (sim.campaignDurationMonths / 12) : 0;
+
+  const getPaymentSchedule = () => {
+    switch (paymentMode) {
+      case "3x": return Array(3).fill(Math.round(totalBudget / 3));
+      case "6x": return Array(6).fill(Math.round(totalBudget / 6));
+      default: return [totalBudget];
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,17 +51,17 @@ export default function Order() {
     setIsSubmitted(true);
   };
 
-  const getPaymentSchedule = () => {
-    const total = simulationData.annualBudget;
-    switch (paymentMode) {
-      case "3x":
-        return Array(3).fill(Math.round(total / 3));
-      case "6x":
-        return Array(6).fill(Math.round(total / 6));
-      default:
-        return [total];
-    }
-  };
+  if (!sim) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA]">
+        <Header />
+        <div className="container mx-auto px-4 py-24 text-center">
+          <p className="text-lg text-[#0B1F3B]/60 mb-6">Aucune simulation trouvée. Veuillez d'abord compléter votre simulation.</p>
+          <Link to="/"><Button className="bg-[#1E6FFF] text-white">Retour au simulateur</Button></Link>
+        </div>
+      </div>
+    );
+  }
 
   if (isSubmitted) {
     return (
@@ -60,38 +73,29 @@ export default function Order() {
               <CheckCircle2 className="w-12 h-12 text-[#1DBF73]" />
             </div>
             <h1 className="text-3xl font-bold text-[#0B1220] mb-4">
-              Merci, votre commande est confirmée !
+              {wantCallback ? "Demande de rappel confirmée !" : "Commande confirmée !"}
             </h1>
+            <p className="text-lg text-[#0B1F3B]/60 mb-8">
+              {wantCallback
+                ? "Un expert Attard Multimédia vous rappellera sous 24h pour finaliser votre campagne et vous accompagner dans les prochaines étapes."
+                : "Un expert Attard Multimédia vous contactera sous 24h pour lancer la création de votre spot (brief créatif, validation, planning de diffusion)."}
+            </p>
             <Card className="p-6 mb-8 bg-white border-[#0B1F3B]/10 text-left">
               <div className="space-y-3">
                 <div className="flex justify-between items-center pb-3 border-b border-[#0B1F3B]/10">
-                  <span className="text-sm text-[#0B1F3B]/60">Numéro de commande</span>
-                  <span className="font-semibold text-[#0B1220]">AM-2026-{Math.random().toString().slice(2, 8)}</span>
+                  <span className="text-sm text-[#0B1F3B]/60">Référence</span>
+                  <span className="font-semibold text-[#0B1220]">AM-{new Date().getFullYear()}-{Math.floor(Math.random() * 900000 + 100000)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#0B1F3B]/60">Montant payé</span>
-                  <span className="font-semibold text-[#1DBF73]">{formatCurrency(simulationData.annualBudget)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#0B1F3B]/60">Écrans</span>
-                  <span className="font-semibold text-[#0B1220]">{simulationData.recommendedScreens}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[#0B1F3B]/60">Durée</span>
-                  <span className="font-semibold text-[#0B1220]">{simulationData.campaignDuration}</span>
+                <div className="flex justify-between"><span className="text-sm text-[#0B1F3B]/60">Hôpital</span><span className="font-semibold">{sim.hospital}</span></div>
+                <div className="flex justify-between"><span className="text-sm text-[#0B1F3B]/60">Écrans</span><span className="font-semibold">{sim.recommendedScreens}</span></div>
+                <div className="flex justify-between"><span className="text-sm text-[#0B1F3B]/60">Durée</span><span className="font-semibold">{sim.campaignDuration}</span></div>
+                <div className="flex justify-between items-center pt-3 border-t border-[#0B1F3B]/10">
+                  <span className="text-sm text-[#0B1F3B]/60">Montant</span>
+                  <span className="font-bold text-xl text-[#1DBF73]">{formatCurrency(totalBudget)}</span>
                 </div>
               </div>
             </Card>
-            <p className="text-lg text-[#0B1F3B]/60 mb-8">
-              Un expert Attard Multimédia va vous contacter sous 24h pour lancer la création de votre spot (brief créatif, validation, planning de diffusion).
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/">
-                <Button size="lg" className="bg-[#1E6FFF] hover:bg-[#1E6FFF]/90 w-full sm:w-auto">
-                  Retour à l'accueil
-                </Button>
-              </Link>
-            </div>
+            <Link to="/"><Button size="lg" className="bg-[#1E6FFF] text-white">Retour à l'accueil</Button></Link>
           </div>
         </div>
       </div>
@@ -101,333 +105,207 @@ export default function Order() {
   return (
     <div className="min-h-screen bg-[#F5F7FA]">
       <Header />
-
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          {/* Breadcrumb */}
           <div className="mb-6">
             <Link to="/" className="inline-flex items-center text-sm text-[#1E6FFF] hover:underline">
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Retour au simulateur
+              <ArrowLeft className="w-4 h-4 mr-1" />Retour au simulateur
             </Link>
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold text-[#0B1220] mb-3">
-            Finaliser ma campagne
-          </h1>
-          <p className="text-lg text-[#0B1F3B]/60 mb-8">
-            Validez votre commande et démarrez votre campagne de diffusion en milieu hospitalier
-          </p>
+          <h1 className="text-3xl md:text-4xl font-bold text-[#0B1220] mb-3">Finaliser ma campagne</h1>
+          <p className="text-lg text-[#0B1F3B]/60 mb-8">Validez votre commande et démarrez votre campagne en milieu hospitalier</p>
 
           <div className="grid lg:grid-cols-3 gap-8">
-            {/* Left Column - Forms */}
+            {/* Colonne gauche */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Campaign Summary */}
-              <Card className="p-6 border-[#0B1F3B]/10 bg-white">
-                <h3 className="text-xl font-semibold text-[#0B1220] mb-4">
-                  Récapitulatif de votre campagne
+
+              {/* Récapitulatif */}
+              <Card className="p-6 border-2 border-[#1E6FFF] bg-gradient-to-br from-[#1E6FFF]/5 to-white">
+                <h3 className="text-xl font-semibold text-[#0B1220] mb-4 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-[#1E6FFF]" />
+                  Plan recommandé par Attard Multimédia
                 </h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Hôpital</span>
-                    <span className="font-medium text-[#0B1220]">{simulationData.hospital}</span>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                  {[
+                    { label: "Hôpital", value: sim.hospital },
+                    { label: "Profession", value: sim.profession },
+                    { label: "Durée du spot", value: sim.spotDuration },
+                    { label: "Durée de campagne", value: sim.campaignDuration },
+                    { label: "Écrans recommandés", value: `${sim.recommendedScreens} écran${sim.recommendedScreens > 1 ? "s" : ""}` },
+                    { label: "ODV ciblé", value: formatNumber(sim.odv) },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="p-3 bg-white rounded-lg border border-[#0B1F3B]/10">
+                      <p className="text-xs text-[#0B1F3B]/50 mb-1">{label}</p>
+                      <p className="font-semibold text-[#0B1220] text-sm">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1DBF73]/10 rounded-full border border-[#1DBF73]/20">
+                    <span className="text-xs font-semibold text-[#1DBF73]">ROI estimé : +{sim.roi.toFixed(1)}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Profession</span>
-                    <span className="font-medium text-[#0B1220]">{simulationData.profession}</span>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1E6FFF]/10 rounded-full border border-[#1E6FFF]/20">
+                    <span className="text-xs font-semibold text-[#1E6FFF]">{formatNumber(sim.annualPassages)} ODV/an</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Durée du spot</span>
-                    <span className="font-medium text-[#0B1220]">{simulationData.spotDuration}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Durée de campagne</span>
-                    <span className="font-medium text-[#0B1220]">{simulationData.campaignDuration}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Écrans recommandés</span>
-                    <span className="font-medium text-[#0B1220]">{simulationData.recommendedScreens}</span>
-                  </div>
-                  <div className="flex justify-between pt-3 border-t border-[#0B1F3B]/10">
-                    <span className="text-[#0B1F3B]/60">CA potentiel estimé</span>
-                    <span className="font-semibold text-[#1DBF73]">{formatCurrency(simulationData.potentialRevenue)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">ROI estimé</span>
-                    <Badge className="bg-[#1DBF73] text-white">+{simulationData.roi}%</Badge>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0B1F3B]/5 rounded-full border border-[#0B1F3B]/10">
+                    <span className="text-xs font-semibold text-[#0B1220]">~{sim.estimatedLeads} leads estimés/an</span>
                   </div>
                 </div>
-                <p className="text-xs text-[#0B1F3B]/50 mt-4">
-                  Ces chiffres sont basés sur nos données DOOH santé et restent des projections théoriques.
-                </p>
               </Card>
 
-              {/* Company Information */}
+              {/* Option : être rappelé */}
               <Card className="p-6 border-[#0B1F3B]/10 bg-white">
-                <h3 className="text-xl font-semibold text-[#0B1220] mb-4">
-                  Informations entreprise
+                <h3 className="text-xl font-semibold text-[#0B1220] mb-4 flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-[#1E6FFF]" />
+                  Vous préférez être rappelé ?
                 </h3>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="companyName">Raison sociale *</Label>
-                      <Input id="companyName" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
+                <div
+                  onClick={() => setWantCallback(!wantCallback)}
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${wantCallback ? "border-[#1E6FFF] bg-[#1E6FFF]/5" : "border-[#0B1F3B]/10 hover:border-[#1E6FFF]/40"}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${wantCallback ? "border-[#1E6FFF] bg-[#1E6FFF]" : "border-[#0B1F3B]/30"}`}>
+                      {wantCallback && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
                     <div>
-                      <Label htmlFor="legalForm">Forme juridique *</Label>
-                      <Select required>
-                        <SelectTrigger className="bg-[#F5F7FA] border-[#0B1F3B]/10">
-                          <SelectValue placeholder="Sélectionner" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sarl">SARL</SelectItem>
-                          <SelectItem value="sas">SAS</SelectItem>
-                          <SelectItem value="eurl">EURL</SelectItem>
-                          <SelectItem value="ei">EI</SelectItem>
-                          <SelectItem value="auto">Auto-entrepreneur</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="siret">SIRET *</Label>
-                      <Input id="siret" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                    </div>
-                    <div>
-                      <Label htmlFor="vat">TVA intracommunautaire</Label>
-                      <Input id="vat" className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
+                      <p className="font-medium text-[#0B1220]">Je souhaite être rappelé par un expert</p>
+                      <p className="text-sm text-[#0B1F3B]/60 mt-1">Un conseiller Attard Multimédia vous contactera sous 24h pour vous accompagner, répondre à vos questions et finaliser votre commande ensemble.</p>
                     </div>
                   </div>
+                </div>
+              </Card>
 
+              {/* Informations entreprise */}
+              <Card className="p-6 border-[#0B1F3B]/10 bg-white">
+                <h3 className="text-xl font-semibold text-[#0B1220] mb-4">Informations entreprise</h3>
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div><Label htmlFor="firstName">Prénom *</Label><Input id="firstName" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" /></div>
+                    <div><Label htmlFor="lastName">Nom *</Label><Input id="lastName" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" /></div>
+                    <div><Label htmlFor="email">Email *</Label><Input id="email" type="email" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" /></div>
+                    <div><Label htmlFor="phone">Téléphone *</Label><Input id="phone" type="tel" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" /></div>
+                    <div><Label htmlFor="companyName">Raison sociale *</Label><Input id="companyName" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" /></div>
+                    <div><Label htmlFor="siret">SIRET *</Label><Input id="siret" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" /></div>
+                  </div>
                   <div>
-                    <Label htmlFor="address">Adresse complète *</Label>
-                    <Input id="address" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mb-3" />
-                    <div className="grid md:grid-cols-3 gap-3">
+                    <Label htmlFor="address">Adresse *</Label>
+                    <Input id="address" required className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1 mb-2" />
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                       <Input placeholder="Code postal *" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
                       <Input placeholder="Ville *" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                      <Input placeholder="Pays *" defaultValue="France" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
+                      <Input placeholder="Pays" defaultValue="France" className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
                     </div>
                   </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
+                  {wantCallback && (
                     <div>
-                      <Label htmlFor="signatoryName">Nom du signataire *</Label>
-                      <Input id="signatoryName" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
+                      <Label htmlFor="callbackTime">Créneau de rappel souhaité</Label>
+                      <Input id="callbackTime" placeholder="ex: Mardi matin, Jeudi après-midi..." className="bg-[#F5F7FA] border-[#0B1F3B]/10 mt-1" />
                     </div>
-                    <div>
-                      <Label htmlFor="function">Fonction *</Label>
-                      <Input id="function" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                    </div>
-                    <div>
-                      <Label htmlFor="billingEmail">Email de facturation *</Label>
-                      <Input id="billingEmail" type="email" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                    </div>
-                    <div>
-                      <Label htmlFor="billingPhone">Téléphone de facturation *</Label>
-                      <Input id="billingPhone" type="tel" required className="bg-[#F5F7FA] border-[#0B1F3B]/10" />
-                    </div>
-                  </div>
-
+                  )}
                   <div className="flex items-start space-x-2">
                     <Checkbox id="certify" required />
                     <Label htmlFor="certify" className="text-sm cursor-pointer leading-relaxed">
-                      Je certifie l'exactitude de ces informations pour l'établissement du devis et de la facture.
+                      Je certifie l'exactitude de ces informations et accepte les <a href="https://www.attard-multimedia.com/contact" className="text-[#1E6FFF] underline" target="_blank">conditions générales</a> d'Attard Multimédia.
                     </Label>
                   </div>
-                </form>
-              </Card>
 
-              {/* Payment Method */}
-              <Card className="p-6 border-[#0B1F3B]/10 bg-white">
-                <h3 className="text-xl font-semibold text-[#0B1220] mb-4">
-                  Mode de paiement
-                </h3>
-                
-                <RadioGroup value={paymentMode} onValueChange={(value) => setPaymentMode(value as "1x" | "3x" | "6x")}>
-                  <div className="space-y-3 mb-6">
-                    <div className={`p-4 rounded-lg border-2 transition-all ${
-                      paymentMode === "1x" ? "border-[#1E6FFF] bg-[#1E6FFF]/5" : "border-[#0B1F3B]/10"
-                    }`}>
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="1x" id="pay1x" />
-                        <Label htmlFor="pay1x" className="flex-1 cursor-pointer">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Paiement en 1 fois</span>
-                            <span className="font-bold text-[#0B1220]">{formatCurrency(simulationData.annualBudget)}</span>
-                          </div>
-                        </Label>
-                      </div>
-                    </div>
-
-                    <div className={`p-4 rounded-lg border-2 transition-all ${
-                      paymentMode === "3x" ? "border-[#1E6FFF] bg-[#1E6FFF]/5" : "border-[#0B1F3B]/10"
-                    }`}>
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="3x" id="pay3x" />
-                        <Label htmlFor="pay3x" className="flex-1 cursor-pointer">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Paiement en 3 fois</span>
-                            <span className="font-bold text-[#0B1220]">
-                              3 × {formatCurrency(Math.round(simulationData.annualBudget / 3))}
-                            </span>
-                          </div>
-                        </Label>
-                      </div>
-                    </div>
-
-                    <div className={`p-4 rounded-lg border-2 transition-all ${
-                      paymentMode === "6x" ? "border-[#1E6FFF] bg-[#1E6FFF]/5" : "border-[#0B1F3B]/10"
-                    }`}>
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="6x" id="pay6x" />
-                        <Label htmlFor="pay6x" className="flex-1 cursor-pointer">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Paiement en 6 fois</span>
-                            <span className="font-bold text-[#0B1220]">
-                              6 × {formatCurrency(Math.round(simulationData.annualBudget / 6))}
-                            </span>
-                          </div>
-                        </Label>
-                      </div>
-                    </div>
-                  </div>
-                </RadioGroup>
-
-                {paymentMode !== "1x" && (
-                  <div className="p-4 bg-[#F5F7FA] rounded-lg mb-6">
-                    <p className="text-sm font-medium text-[#0B1220] mb-2">Échéancier</p>
-                    <div className="space-y-1 text-sm">
-                      {getPaymentSchedule().map((amount, index) => (
-                        <div key={index} className="flex justify-between">
-                          <span className="text-[#0B1F3B]/60">Échéance {index + 1}</span>
-                          <span className="font-medium">{formatCurrency(amount)}</span>
+                  {/* Paiement */}
+                  {!wantCallback && (
+                    <div className="space-y-4 pt-4 border-t border-[#0B1F3B]/10">
+                      <h4 className="font-semibold text-[#0B1220]">Mode de paiement</h4>
+                      <RadioGroup value={paymentMode} onValueChange={(v) => setPaymentMode(v as "1x" | "3x" | "6x")}>
+                        <div className="space-y-3">
+                          {[
+                            { value: "1x", label: "Paiement en 1 fois", amount: formatCurrency(totalBudget) },
+                            { value: "3x", label: "Paiement en 3 fois", amount: `3 × ${formatCurrency(Math.round(totalBudget / 3))}` },
+                            { value: "6x", label: "Paiement en 6 fois", amount: `6 × ${formatCurrency(Math.round(totalBudget / 6))}` },
+                          ].map(({ value, label, amount }) => (
+                            <div key={value} className={`p-4 rounded-lg border-2 transition-all ${paymentMode === value ? "border-[#1E6FFF] bg-[#1E6FFF]/5" : "border-[#0B1F3B]/10"}`}>
+                              <div className="flex items-center space-x-3">
+                                <RadioGroupItem value={value} id={`pay${value}`} />
+                                <Label htmlFor={`pay${value}`} className="flex-1 cursor-pointer flex justify-between">
+                                  <span className="font-medium">{label}</span>
+                                  <span className="font-bold text-[#0B1220]">{amount}</span>
+                                </Label>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      </RadioGroup>
 
-                {/* Card Payment */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-[#0B1220] flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-[#1E6FFF]" />
-                    Paiement sécurisé par carte
-                  </h4>
+                      {paymentMode !== "1x" && (
+                        <div className="p-4 bg-[#F5F7FA] rounded-lg">
+                          <p className="text-sm font-medium text-[#0B1220] mb-2">Échéancier prévisionnel</p>
+                          <div className="space-y-1 text-sm">
+                            {getPaymentSchedule().map((amount, i) => (
+                              <div key={i} className="flex justify-between">
+                                <span className="text-[#0B1F3B]/60">Échéance {i + 1}</span>
+                                <span className="font-medium">{formatCurrency(amount)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="cardNumber">Numéro de carte *</Label>
-                      <Input
-                        id="cardNumber"
-                        placeholder="1234 5678 9012 3456"
-                        required
-                        className="bg-[#F5F7FA] border-[#0B1F3B]/10"
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="cardName">Nom sur la carte *</Label>
-                      <Input
-                        id="cardName"
-                        required
-                        className="bg-[#F5F7FA] border-[#0B1F3B]/10"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="expiry">Date d'expiration *</Label>
-                        <Input
-                          id="expiry"
-                          placeholder="MM/AA"
-                          required
-                          className="bg-[#F5F7FA] border-[#0B1F3B]/10"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="cvv">CVV *</Label>
-                        <Input
-                          id="cvv"
-                          placeholder="123"
-                          required
-                          maxLength={3}
-                          className="bg-[#F5F7FA] border-[#0B1F3B]/10"
-                        />
+                      <div className="flex items-center gap-2 p-3 bg-[#1DBF73]/5 rounded-lg border border-[#1DBF73]/20">
+                        <Shield className="w-4 h-4 text-[#1DBF73] flex-shrink-0" />
+                        <p className="text-xs text-[#0B1220]">
+                          Paiement sécurisé — chiffrement SSL — aucune donnée bancaire stockée par Attard Multimédia. Le règlement définitif sera effectué après validation de votre devis par notre équipe.
+                        </p>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="flex items-center gap-2 p-3 bg-[#1DBF73]/5 rounded-lg border border-[#1DBF73]/20">
-                    <Shield className="w-4 h-4 text-[#1DBF73]" />
-                    <p className="text-xs text-[#0B1220]">
-                      Paiement sécurisé – chiffrement SSL – aucune donnée bancaire stockée par Attard Multimédia
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                  <Button
-                    onClick={handleSubmit}
-                    size="lg"
-                    className="bg-[#1DBF73] hover:bg-[#1DBF73]/90 text-white flex-1"
-                  >
-                    <CreditCard className="mr-2 w-5 h-5" />
-                    Valider et payer ma campagne
+                  <Button type="submit" size="lg" className={`w-full text-white ${wantCallback ? "bg-[#1E6FFF] hover:bg-[#1E6FFF]/90" : "bg-[#1DBF73] hover:bg-[#1DBF73]/90"}`}>
+                    {wantCallback ? (
+                      <><Phone className="mr-2 w-5 h-5" />Demander à être rappelé</>
+                    ) : (
+                      <><CreditCard className="mr-2 w-5 h-5" />Valider ma commande</>
+                    )}
                   </Button>
-                  <Link to="/rendez-vous" className="flex-1">
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="border-[#1E6FFF] text-[#1E6FFF] hover:bg-[#1E6FFF]/10 w-full"
-                    >
-                      Parler d'abord à un expert
-                    </Button>
-                  </Link>
-                </div>
+                </form>
               </Card>
             </div>
 
-            {/* Right Column - Quote Summary */}
+            {/* Colonne droite — devis */}
             <div className="lg:col-span-1">
               <Card className="p-6 border-[#0B1F3B]/10 bg-white sticky top-24">
-                <h3 className="text-lg font-semibold text-[#0B1220] mb-4">
-                  Devis en direct
-                </h3>
-
+                <h3 className="text-lg font-semibold text-[#0B1220] mb-4">Devis estimatif</h3>
                 <div className="space-y-3 text-sm mb-6">
                   <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Montant annuel HT</span>
-                    <span className="font-medium">{formatCurrency(simulationData.annualBudget / 1.2)}</span>
+                    <span className="text-[#0B1F3B]/60">Montant HT</span>
+                    <span className="font-medium">{formatCurrency(totalBudget / 1.2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#0B1F3B]/60">TVA (20%)</span>
-                    <span className="font-medium">{formatCurrency(simulationData.annualBudget - simulationData.annualBudget / 1.2)}</span>
+                    <span className="font-medium">{formatCurrency(totalBudget - totalBudget / 1.2)}</span>
                   </div>
                   <div className="flex justify-between pt-3 border-t border-[#0B1F3B]/10">
-                    <span className="font-semibold text-[#0B1220]">Total TTC annuel</span>
-                    <span className="font-bold text-xl text-[#1E6FFF]">{formatCurrency(simulationData.annualBudget)}</span>
+                    <span className="font-semibold text-[#0B1220]">Total TTC</span>
+                    <span className="font-bold text-xl text-[#1E6FFF]">{formatCurrency(totalBudget)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Coût mensuel moyen</span>
-                    <span className="font-medium">{formatCurrency(simulationData.monthlyBudget)}</span>
+                    <span className="text-[#0B1F3B]/60">Par mois</span>
+                    <span className="font-medium">{formatCurrency(sim.monthlyBudget)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#0B1F3B]/60">Coût journalier</span>
-                    <span className="font-medium">{formatCurrency(simulationData.costPerDay)}</span>
+                    <span className="text-[#0B1F3B]/60">Par jour</span>
+                    <span className="font-medium">{formatCurrency(sim.costPerDay)}</span>
                   </div>
                 </div>
-
-                <div className="p-4 bg-[#1DBF73]/10 rounded-lg border border-[#1DBF73]/20 mb-4">
-                  <p className="text-sm font-semibold text-[#0B1220] mb-1">
-                    ROI estimé : +{simulationData.roi}%
-                  </p>
-                  <Badge className="bg-[#1DBF73] text-white">Rentable</Badge>
-                </div>
-
+                {sim.roi > 0 && (
+                  <div className="p-3 bg-[#1DBF73]/10 rounded-lg border border-[#1DBF73]/20 mb-4">
+                    <p className="text-sm font-semibold text-[#0B1220]">ROI estimé : +{sim.roi.toFixed(1)}%</p>
+                    <Badge className="bg-[#1DBF73] text-white mt-1">Rentable</Badge>
+                  </div>
+                )}
                 <div className="p-3 bg-[#F5F7FA] rounded-lg">
                   <p className="text-xs text-[#0B1F3B]/60">
-                    Comprend : {simulationData.recommendedScreens} écran{simulationData.recommendedScreens > 1 ? "s" : ""}, création du spot, accompagnement expert
+                    Comprend : {sim.recommendedScreens} écran{sim.recommendedScreens > 1 ? "s" : ""}, création du spot, accompagnement expert
                   </p>
                 </div>
+                <p className="text-xs text-[#0B1F3B]/40 mt-3">* Ce devis est indicatif. La facture définitive sera établie par notre équipe après validation.</p>
               </Card>
             </div>
           </div>

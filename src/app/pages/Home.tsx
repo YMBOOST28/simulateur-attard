@@ -14,6 +14,8 @@ import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { calculateSimulationResults, calculateMinODV, calculateMaxODV } from "../utils/calculations";
 import { hospitals } from "../data/hospitals";
+import { professions } from "../data/professions";
+import { saveSimulation } from "../utils/simulationStore";
 import type { SimulationData } from "../types/simulation";
 
 export default function Home() {
@@ -292,44 +294,59 @@ export default function Home() {
       {/* Sticky CTAs */}
       {canShowResults && results && (() => {
         const selectedHospitalData = hospitals.find(h => h.id === simulationData.hospital);
+        const selectedProfessionData = professions.find(p => p.id === simulationData.profession);
         const odooBase = "https://www.attard-multimedia.com";
-        const contactUrl = selectedHospitalData
+        const hospitalUrl = selectedHospitalData
           ? `${odooBase}/${selectedHospitalData.odooSlug}`
-          : `${odooBase}/contact`;
+          : `${odooBase}/product`;
+        const hasDedie = selectedHospitalData && selectedHospitalData.odooSlug !== "contact";
+
+        const handleSaveAndGo = () => {
+          if (selectedHospitalData && selectedProfessionData && results) {
+            saveSimulation({
+              data: simulationData,
+              results,
+              hospitalName: selectedHospitalData.name,
+              professionName: selectedProfessionData.name,
+            });
+          }
+        };
         return (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#0B1F3B]/10 shadow-2xl">
           <div className="container mx-auto px-4 py-4">
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <a href={`${odooBase}/survey/start/04708502-1c69-4aad-9b87-d3381d9f6ca8`} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
-                <Button
-                  size="lg"
-                  className="bg-[#1DBF73] hover:bg-[#1DBF73]/90 text-white w-full sm:w-auto"
-                >
+              <Link to="/commander" onClick={handleSaveAndGo} className="w-full sm:w-auto">
+                <Button size="lg" className="bg-[#1DBF73] hover:bg-[#1DBF73]/90 text-white w-full sm:w-auto">
                   <ShoppingCart className="mr-2 w-5 h-5" />
                   Je passe commande
                 </Button>
-              </a>
+              </Link>
+
+              <Link to="/brochure" onClick={handleSaveAndGo} className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" className="border-[#1E6FFF] text-[#1E6FFF] hover:bg-[#1E6FFF]/10 w-full sm:w-auto">
+                  <Download className="mr-2 w-5 h-5" />
+                  Télécharger mon rapport
+                </Button>
+              </Link>
 
               <a href={`${odooBase}/contact`} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-[#1E6FFF] text-[#1E6FFF] hover:bg-[#1E6FFF]/10 w-full sm:w-auto"
-                >
+                <Button size="lg" variant="outline" className="border-[#1E6FFF] text-[#1E6FFF] hover:bg-[#1E6FFF]/10 w-full sm:w-auto">
                   <Calendar className="mr-2 w-5 h-5" />
                   Parler à un expert
                 </Button>
               </a>
 
               {selectedHospitalData && (
-                <a href={contactUrl} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
+                <a href={hospitalUrl} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
                   <Button
                     size="lg"
                     variant="outline"
                     className="border-[#0B1F3B]/20 text-[#0B1220] hover:bg-[#0B1F3B]/5 w-full sm:w-auto"
                   >
                     <Building2 className="mr-2 w-5 h-5" />
-                    Voir {selectedHospitalData.name}
+                    {hasDedie
+                      ? `Voir ${selectedHospitalData.name}`
+                      : `En savoir plus sur ${selectedHospitalData.city}`}
                   </Button>
                 </a>
               )}

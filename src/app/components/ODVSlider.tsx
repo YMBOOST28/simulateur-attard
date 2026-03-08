@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatNumber } from "../utils/calculations";
 import { Info } from "lucide-react";
 import {
@@ -15,10 +16,12 @@ interface ODVSliderProps {
 }
 
 export default function ODVSlider({ value, onChange, minODV, maxODV }: ODVSliderProps) {
+  const [inputMode, setInputMode] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+
   const safeMin = Math.max(0, minODV);
   const safeMax = Math.max(safeMin + 1000, maxODV);
   const safeValue = Math.max(safeMin, Math.min(safeMax, value));
-
   const step = Math.max(1000, Math.round((safeMax - safeMin) / 50 / 1000) * 1000);
   const pct = ((safeValue - safeMin) / (safeMax - safeMin)) * 100;
 
@@ -31,6 +34,17 @@ export default function ODVSlider({ value, onChange, minODV, maxODV }: ODVSlider
   };
 
   const { label, color } = getODVLabel();
+
+  const handleInputConfirm = () => {
+    const raw = inputValue.replace(/\s/g, "").replace(/[^0-9]/g, "");
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed)) {
+      const clamped = Math.max(safeMin, Math.min(safeMax, parsed));
+      onChange(clamped);
+    }
+    setInputMode(false);
+    setInputValue("");
+  };
 
   return (
     <div className="space-y-4">
@@ -45,20 +59,50 @@ export default function ODVSlider({ value, onChange, minODV, maxODV }: ODVSlider
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
               <p className="text-sm">
-                L'ODV représente le nombre annuel d'opportunités pour un patient de voir votre spot. Il varie selon la fréquentation de l'hôpital et le nombre d'écrans loués (1 à 4).
+                L'ODV représente le nombre annuel d'opportunités pour un patient de voir votre spot. Il varie selon la fréquentation de l'hôpital et le nombre d'écrans (1 à 4). Plus vous choisissez d'ODV, plus le nombre d'écrans recommandés augmente.
               </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
       </div>
 
-      {/* Valeur centrale */}
+      {/* Valeur centrale — cliquable pour saisie directe */}
       <div className="text-center py-2">
-        <p className="text-3xl font-bold text-[#0B1220]">{formatNumber(safeValue)}</p>
+        {inputMode ? (
+          <div className="flex items-center justify-center gap-2">
+            <input
+              type="text"
+              autoFocus
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleInputConfirm();
+                if (e.key === "Escape") { setInputMode(false); setInputValue(""); }
+              }}
+              onBlur={handleInputConfirm}
+              placeholder={formatNumber(safeValue)}
+              className="w-40 text-center text-2xl font-bold border-b-2 border-[#1E6FFF] outline-none bg-transparent text-[#0B1220]"
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => { setInputMode(true); setInputValue(String(safeValue)); }}
+            className="group text-center"
+            title="Cliquer pour saisir un nombre précis"
+          >
+            <p className="text-3xl font-bold text-[#0B1220] group-hover:text-[#1E6FFF] transition-colors">
+              {formatNumber(safeValue)}
+            </p>
+            <p className="text-xs text-[#0B1F3B]/40 mt-0.5 group-hover:text-[#1E6FFF]/60 transition-colors">
+              ✏️ Cliquer pour saisir un nombre précis
+            </p>
+          </button>
+        )}
         <p className="text-sm font-medium mt-1" style={{ color }}>{label}</p>
       </div>
 
-      {/* Slider natif avec styles inline pour garantir le rendu */}
+      {/* Slider natif */}
       <div className="px-1">
         <style>{`
           .odv-slider {
@@ -111,8 +155,8 @@ export default function ODVSlider({ value, onChange, minODV, maxODV }: ODVSlider
 
       {/* Labels min/max */}
       <div className="flex justify-between text-xs text-[#0B1F3B]/50 px-1">
-        <span>{formatNumber(safeMin)}</span>
-        <span>{formatNumber(safeMax)}</span>
+        <span>Min : {formatNumber(safeMin)}</span>
+        <span>Max : {formatNumber(safeMax)}</span>
       </div>
 
       {/* Boutons +/- */}
@@ -135,7 +179,7 @@ export default function ODVSlider({ value, onChange, minODV, maxODV }: ODVSlider
 
       <p className="text-xs text-[#0B1F3B]/50 flex items-start gap-1">
         <span>*</span>
-        <span>ODV = fréquentation hôpital × nombre d'écrans × 365 jours. Taux de conversion basé sur les études Publicis / Broadsign DOOH Santé.</span>
+        <span>ODV = fréquentation hôpital × nombre d'écrans × 365 jours. Le nombre d'écrans recommandés s'adapte automatiquement à votre objectif ODV.</span>
       </p>
     </div>
   );

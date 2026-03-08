@@ -24,7 +24,7 @@ export const hospitals: Hospital[] = [
   { id: "rennes", name: "CHU Rennes", city: "Rennes", passagesPerDay: 22560, odooSlug: "rennes", region: "Bretagne" },
   { id: "la-rochelle", name: "CH La Rochelle", city: "La Rochelle", passagesPerDay: 13090, odooSlug: "la-rochelle", region: "Nouvelle-Aquitaine" },
 
-  // Auvergne-Rhône-Alpes / Centre
+  // Auvergne-Rhône-Alpes
   { id: "montlucon", name: "CH Montluçon", city: "Montluçon", passagesPerDay: 8600, odooSlug: "montlucon", region: "Auvergne-Rhône-Alpes" },
   { id: "roanne", name: "CH Roanne", city: "Roanne", passagesPerDay: 7240, odooSlug: "roanne", region: "Auvergne-Rhône-Alpes" },
 
@@ -34,7 +34,7 @@ export const hospitals: Hospital[] = [
   { id: "agde", name: "CH Agde", city: "Agde", passagesPerDay: 4200, odooSlug: "bassin-de-thau", region: "Occitanie" },
   { id: "sete", name: "CH Sète", city: "Sète", passagesPerDay: 6230, odooSlug: "bassin-de-thau", region: "Occitanie" },
 
-  // PACA / Côte d'Azur
+  // PACA
   { id: "marseille", name: "AP-HM Marseille", city: "Marseille", passagesPerDay: 49870, odooSlug: "contact", region: "PACA" },
   { id: "aix-en-provence", name: "CH Aix-en-Provence", city: "Aix-en-Provence", passagesPerDay: 9580, odooSlug: "aix-en-provence", region: "PACA" },
   { id: "arles", name: "CH Arles", city: "Arles", passagesPerDay: 8320, odooSlug: "arles", region: "PACA" },
